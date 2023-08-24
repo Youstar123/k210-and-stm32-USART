@@ -1,0 +1,37 @@
+import sensor, image, time,math,lcd
+from machine import UART
+from fpioa_manager import fm
+#串口初始化
+fm.register(7, fm.fpioa.UART1_TX, force=True) 
+fm.register(6, fm.fpioa.UART1_RX, force=True)
+uart = UART(UART.UART1, 115200, 8, 0, 1, timeout=1000, read_buf_len=4096)
+uart.init(115200, bits=8, parity=None, stop=1, timeout_char=1000)
+
+lcd.init()
+sensor.reset()
+sensor.set_pixformat(sensor.RGB565)
+sensor.set_framesize(sensor.QQVGA)
+sensor.skip_frames(time=2000)
+sensor.set_vflip(0)
+sensor.set_hmirror(0)
+
+clock = time.clock()
+
+while True:
+    clock.tick()
+    img = sensor.snapshot()
+    # 下面的threshold应设置为足够高的值，以滤除在图像中检测到的具有
+    # 低边缘幅度的噪声矩形。最适用于背景形成鲜明对比的矩形。
+    for r in img.find_rects(threshold=10000):
+        img.draw_rectangle(r.rect(), color=(255, 0, 0))
+        for p in r.corners():
+            img.draw_circle(p[0], p[1], 5, color=(0, 255, 0))
+            corners=r.corners()
+        for i, corner in enumerate(r.corners()):
+            x, y = corner
+            #print("A %d: x=%d, y=%dBC" % (i+1, x, y))
+            print("Ax1=%d,y1=%d,x2=%d,y2=%d,x3=%d,y3=%d,x4=%d,y4=%dBC" % (corners[0][0],corners[0][1],corners[1][0],corners[1][1],corners[2][0],corners[2][1],corners[3][0],corners[3][1]))
+            
+            # 发送顶点的坐标信息到STM32
+            uart.write("Ax1=%d,y1=%d,x2=%d,y2=%d,x3=%d,y3=%d,x4=%d,y4=%dBC" % (corners[0][0],corners[0][1],corners[1][0],corners[1][1],corners[2][0],corners[2][1],corners[3][0],corners[3][1]))
+    lcd.display(img)  # 显示图像
